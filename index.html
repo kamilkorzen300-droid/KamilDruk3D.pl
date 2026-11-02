@@ -1,1 +1,231 @@
 
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kamil3D.pl</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080d18;color:white;font-family:Arial}
+header{text-align:center;padding:25px;background:#101c32;border-bottom:2px solid #168cff}
+h1{color:#42a5ff}
+main{max-width:1100px;margin:auto;padding:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:15px}
+.card,.panel{background:#14233b;padding:16px;border-radius:12px}
+.price{color:#65b5ff;font-weight:bold}
+button{background:#168cff;color:white;border:0;border-radius:8px;padding:11px;cursor:pointer;margin-top:8px}
+input,select{padding:10px;width:100%;margin:6px 0;border-radius:7px;border:0}
+section{margin-top:25px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+<h1>Kamil3D.pl</h1>
+<p>Twoje pomysły. Nasze wydruki 3D.</p>
+</header>
+
+<section id="login" class="panel" style="max-width:400px;margin:60px auto">
+<h2>🔐 Kod dostępu</h2>
+<input id="entry" type="password" placeholder="Wpisz kod">
+<button onclick="enter()">Wejdź do sklepu</button>
+<p id="loginMsg"></p>
+</section>
+
+<main id="shop" class="hidden">
+<h2>Nasze produkty</h2>
+<div class="grid" id="products"></div>
+
+<section class="panel">
+<h2>🛒 Koszyk</h2>
+<div id="items">Koszyk jest pusty.</div>
+<h3 id="total">Razem: 0 zł</h3>
+
+<h3>🎟️ Bon</h3>
+<input id="voucher" placeholder="Wpisz kod bonu">
+<button onclick="applyVoucher()">Zastosuj bon</button>
+<p id="voucherMsg"></p>
+<p id="discount"></p>
+<button onclick="clearCart()">Wyczyść koszyk</button>
+<button onclick="checkout()">Złóż zamówienie demonstracyjne</button>
+<p id="orderMsg"></p>
+</section>
+
+<section class="panel">
+<h2>Panel administratora – demo</h2>
+<input id="admin" type="password" placeholder="Kod administratora">
+<button onclick="adminLogin()">Otwórz panel</button>
+<p id="adminMsg"></p>
+<div id="adminPanel" class="hidden">
+<h3>Wykorzystane bony</h3>
+<div id="usedList"></div>
+<h3>Zamówienia demonstracyjne</h3>
+<div id="orders"></div>
+</div>
+</section>
+</main>
+
+<script>
+const ENTRY_CODE="2137&&";
+const ADMIN_CODE="USTAW_TUTAJ_KOD_ADMINA";
+const colors=["Czarny","Biały","Granatowy","Pomarańczowy","Zielony","Szary","Fioletowy"];
+
+const products=[
+["Brelok z imieniem",8],["Brelok serce",8],
+["Stojak na telefon",15],["Uchwyt na słuchawki",20],
+["Organizer na biurko",25],["Kubek na długopisy",18],
+["Podstawka pod kubek",8],["Doniczka dekoracyjna",15],
+["Figurka kota",20],["Figurka psa",20],
+["Mini domek",25],["Ozdoba gwiazda",10],
+["Zacisk na kabel",5],["Pudełko na drobiazgi",18],
+["Zawieszka z napisem",12],["Stojak na kontroler",25]
+];
+
+const regular=[
+"KAMIL3D-01","KAMIL3D-02","KAMIL3D-03","KAMIL3D-04",
+"KAMIL3D-05","KAMIL3D-06","KAMIL3D-07","KAMIL3D-08",
+"KAMIL3D-09","KAMIL3D-10"
+];
+
+const free=[
+"5839174280612954","9274603815297481",
+"3618925047368102","7452091863472569",
+"1983746052918374","6240318597264501",
+"8527419306825749","4391860271549283",
+"7165284930176538","2906537184621095"
+];
+
+let cart=[];
+let activeVoucher=null;
+let used=[];
+let orders=[];
+
+function enter(){
+ if(document.getElementById("entry").value===ENTRY_CODE){
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("shop").classList.remove("hidden");
+  renderProducts();
+ }else{
+  document.getElementById("loginMsg").textContent="Nieprawidłowy kod.";
+ }
+}
+
+function renderProducts(){
+ const root=document.getElementById("products");
+ root.innerHTML="";
+ products.forEach((p,i)=>{
+  const card=document.createElement("div");
+  card.className="card";
+  const name=document.createElement("h3");
+  name.textContent=p[0];
+  const price=document.createElement("p");
+  price.className="price";
+  price.textContent=p[1]+" zł";
+  const select=document.createElement("select");
+  colors.forEach(c=>{
+   const option=document.createElement("option");
+   option.value=c;
+   option.textContent=c;
+   select.appendChild(option);
+  });
+  const add=document.createElement("button");
+  add.textContent="Dodaj do koszyka";
+  add.onclick=()=>{
+   cart.push({name:p[0],price:p[1],color:select.value});
+   renderCart();
+  };
+  card.append(name,price,select,add);
+  root.appendChild(card);
+ });
+}
+
+function renderCart(){
+ const root=document.getElementById("items");
+ root.innerHTML="";
+ if(!cart.length)root.textContent="Koszyk jest pusty.";
+ cart.forEach((item,i)=>{
+  const row=document.createElement("p");
+  row.textContent=item.name+" – "+item.color+" – "+item.price+" zł ";
+  const remove=document.createElement("button");
+  remove.textContent="Usuń";
+  remove.onclick=()=>{cart.splice(i,1);renderCart();};
+  row.appendChild(remove);
+  root.appendChild(row);
+ });
+ updateTotal();
+}
+
+function subtotal(){
+ return cart.reduce((sum,p)=>sum+p.price,0);
+}
+
+function updateTotal(){
+ let sum=subtotal();
+ if(activeVoucher?.type==="regular")sum=Math.max(0,sum-5);
+ if(activeVoucher?.type==="free")sum=Math.max(0,sum-activeVoucher.price);
+ document.getElementById("total").textContent="Razem: "+sum+" zł";
+}
+
+function applyVoucher(){
+ const code=document.getElementById("voucher").value.trim().toUpperCase();
+ const msg=document.getElementById("voucherMsg");
+ if(!cart.length){msg.textContent="Najpierw dodaj produkt do koszyka.";return;}
+ if(used.includes(code)){msg.textContent="Ten bon został już wykorzystany.";return;}
+ if(activeVoucher){msg.textContent="Możesz użyć tylko jednego bonu naraz.";return;}
+ if(regular.includes(code)){
+  activeVoucher={code,type:"regular"};
+  msg.textContent="Bon rabatowy 5 zł zastosowany!";
+ }else{
+  const index=free.indexOf(code);
+  if(index>=0){
+   const product=cart[0];
+   activeVoucher={code,type:"free",price:product.price};
+   msg.textContent="Pierwszy produkt w koszyku będzie darmowy!";
+  }else{
+   msg.textContent="Nieprawidłowy kod bonu.";
+   return;
+  }
+ }
+ document.getElementById("discount").textContent="Zastosowany bon: "+code;
+ updateTotal();
+}
+
+function checkout(){
+ if(!cart.length){document.getElementById("orderMsg").textContent="Koszyk jest pusty.";return;}
+ if(activeVoucher)used.push(activeVoucher.code);
+ const total=document.getElementById("total").textContent;
+ orders.push({products:cart.map(x=>x.name).join(", "),total});
+ document.getElementById("orderMsg").textContent=
+ "Zamówienie demonstracyjne zapisane w tej sesji. Razem: "+total;
+ cart=[];
+ activeVoucher=null;
+ document.getElementById("voucher").value="";
+ document.getElementById("voucherMsg").textContent="";
+ document.getElementById("discount").textContent="";
+ renderCart();
+}
+
+function clearCart(){
+ cart=[];
+ activeVoucher=null;
+ document.getElementById("voucherMsg").textContent="";
+ document.getElementById("discount").textContent="";
+ renderCart();
+}
+
+function adminLogin(){
+ if(document.getElementById("admin").value!==ADMIN_CODE){
+  document.getElementById("adminMsg").textContent="Nieprawidłowy kod administratora.";
+  return;
+ }
+ document.getElementById("adminMsg").textContent="Panel demo otwarty.";
+ document.getElementById("adminPanel").classList.remove("hidden");
+ document.getElementById("usedList").textContent=used.join(", ")||"Brak";
+ document.getElementById("orders").textContent=
+ orders.map((o,i)=>"Zamówienie "+(i+1)+": "+o.products+"; "+o.total).join(" | ")||"Brak";
+}
+</script>
+</body>
+</html>
+
